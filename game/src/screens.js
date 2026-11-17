@@ -5,10 +5,10 @@ import { SHIPMENTS } from './shipments.js';
 import { scoreOf } from './scoring.js';
 
 /** A panel centred on the gorge, with a heading, some lines and a prompt. */
-function panel(ctx, label, { heading, lines, prompt, width = 720, accent = PALETTE.accent }) {
+function panel(ctx, label, { heading, lines, prompt, width = 720, accent = PALETTE.accent, offsetX = 0, offsetY = -40 }) {
   const height = 168 + lines.length * 30;
-  const x = (WORLD.width - width) / 2;
-  const y = (WORLD.height - height) / 2 - 40;
+  const x = (WORLD.width - width) / 2 + offsetX;
+  const y = (WORLD.height - height) / 2 + offsetY;
   ctx.save();
   ctx.fillStyle = 'rgba(11,42,49,0.94)';
   ctx.beginPath();
@@ -30,14 +30,16 @@ export function drawTitle(ctx, extras) {
   ctx.restore();
   panel(ctx, extras.label, {
     heading: 'SILKSPAN',
+    width: 636,
+    offsetX: -252,
     lines: [
-      'String taut silk between the posts and sling the harvest crates home.',
-      'Drag from one peg to another to hang a line. The crate is thrown from the chute',
-      'and leaves the line along its own bounce: a short tight span throws it far,',
-      'a long loose one drops it short. Guide it into the bays of the loading dock.',
-      'Wicker shells crack on a tight line. Anvils leave a line hot.',
-      `Clear all ${SHIPMENTS.length} shipments before the barge sails.`,
-      extras.best > 0 ? `Best score on this machine: ${extras.best}` : 'No run on this machine yet.',
+      'String taut silk between the posts, and sling the harvest crates home.',
+      '',
+      'Drag from one post to another to hang a line. A crate leaves a line along',
+      'its own bounce: a short tight span throws it far, a long loose one drops it',
+      'short. Read the dashed guide, then walk it into a bay.',
+      `Wicker shells crack on a tight line; anvils leave a line hot. ${SHIPMENTS.length} shipments to clear.`,
+      extras.best > 0 ? `Best on this machine: ${extras.best}` : 'No run on this machine yet.',
     ],
     prompt: 'Press SPACE, or click, to start',
   });

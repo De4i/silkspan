@@ -3,6 +3,7 @@
 // fit the window and centred, so a screenshot and a play field are the same picture.
 import { CLIFF, DOCK, FONT, PALETTE, SILK, WATER_Y, WORLD } from './config.js';
 import { cablePoint, windReading } from './physics.js';
+import { drawBarge, drawCliffDressing, drawHorizonHaze, drawMastDressing, drawNamePlate, drawShutBay, drawSkyDecor, drawVignette, drawWindStreaks } from './decor.js';
 import { drawHud } from './hud.js';
 import { drawResults, drawTitle } from './screens.js';
 
@@ -152,13 +153,16 @@ export function createRenderer(canvas) {
     ctx.rotate(lean);
     ctx.fillStyle = PALETTE.accent;
     ctx.beginPath();
-    ctx.moveTo(0, -7);
-    ctx.lineTo(46, -13);
-    ctx.lineTo(46, 13);
-    ctx.lineTo(0, 7);
+    ctx.moveTo(0, -9);
+    ctx.lineTo(64, -18);
+    ctx.lineTo(64, 18);
+    ctx.lineTo(0, 9);
     ctx.closePath();
     ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (let band = 0; band < 3; band += 1) ctx.fillRect(14 + band * 17, -14 + band * 1.5, 7, 28 - band * 3);
     ctx.restore();
+    drawWindStreaks(ctx, state.windReading);
     // The crate riding the cable, mid-flight down the chute.
     if (state.chute.active) {
       const point = cablePoint(state.chute.t);
@@ -224,15 +228,17 @@ export function createRenderer(canvas) {
     for (let x = DOCK.left + 24; x < DOCK.right - 10; x += 96) ctx.fillRect(x, DOCK.top + 40, 14, WATER_Y - DOCK.top - 40);
     for (const bay of state.bays) {
       const width = bay.to - bay.from;
-      ctx.save();
-      ctx.strokeStyle = bay.open ? 'rgba(29,59,63,0.55)' : 'rgba(224,92,74,0.85)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash(bay.open ? [] : [12, 9]);
-      ctx.strokeRect(bay.from + 4, DOCK.top + 26, width - 8, 46);
-      ctx.setLineDash([]);
-      label(ctx, bay.open ? bay.label : 'BATTENED', bay.from + width / 2, DOCK.top + 60, 17, bay.open ? PALETTE.ink : PALETTE.danger, 'center');
-      label(ctx, bay.open ? `+${bay.value}` : 'shut', bay.from + width / 2, DOCK.top + 84, 15, bay.open ? 'rgba(29,59,63,0.7)' : PALETTE.danger, 'center');
-      ctx.restore();
+      if (!bay.open) {
+        drawShutBay(ctx, bay, label);
+      } else {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(29,59,63,0.55)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(bay.from + 4, DOCK.top + 26, width - 8, 46);
+        label(ctx, bay.label, bay.from + width / 2, DOCK.top + 60, 19, PALETTE.ink, 'center');
+        label(ctx, `+${bay.value}`, bay.from + width / 2, DOCK.top + 84, 17, 'rgba(29,59,63,0.8)', 'center');
+        ctx.restore();
+      }
       const stacked = state.bayStacks?.[bay.key] ?? 0;
       for (let index = 0; index < stacked; index += 1) {
         const column = index % 6;
@@ -417,11 +423,16 @@ export function createRenderer(canvas) {
     ctx.setTransform(view.scale, 0, 0, view.scale, view.x + offsetX, view.y + offsetY);
 
     drawSky();
+    drawSkyDecor(ctx);
     drawHills();
     drawWater();
+    drawHorizonHaze(ctx);
+    drawBarge(ctx);
     drawCliff();
+    drawCliffDressing(ctx);
     drawChute(state);
     drawMasts(state);
+    drawMastDressing(ctx, state.pegs);
     drawDock(state);
 
     for (const span of state.spans) drawSpan(state, span, extrapolated(state, extras));
@@ -430,6 +441,7 @@ export function createRenderer(canvas) {
     drawGuide(extras.guide);
     drawAirlines(state);
     drawFx(state);
+    drawVignette(ctx);
 
     if (state.flash > 0) {
       ctx.save();
@@ -441,6 +453,7 @@ export function createRenderer(canvas) {
 
     if (state.phase === 'title') {
       drawTitle(ctx, { best: extras.best ?? 0, label });
+      drawNamePlate(ctx, label);
       return;
     }
     drawHud(ctx, state, { best: extras.best ?? 0, label });

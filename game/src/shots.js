@@ -11,9 +11,12 @@ const PLAY_LIMIT_SECONDS = 100;
 export function stageShot(name, state, seed) {
   startRun(state, seed ?? state.seed);
   if (name !== 'play' && name !== 'end') {
-    // The title sits over a dressed gorge: a shipment is loaded, but nothing is running yet.
+    // The title sits over a dressed gorge with every bay open and nothing running: the picture of
+    // the game at its most complete, which is what a cover screenshot should show.
+    state.bays = state.bays.map((bay) => ({ ...bay, open: true }));
     state.phase = PHASE.title;
     state.banner = 0;
+    state.messages = [];
     return { name: 'start' };
   }
   if (name === 'end') {
@@ -21,8 +24,10 @@ export function stageShot(name, state, seed) {
     if (state.phase === PHASE.playing) state.phase = PHASE.results;
     return { name: 'end' };
   }
-  // The play scene waits for a frame worth keeping: a line hanging, a crate in the air over the
-  // gorge with its trail behind it, and the dock ahead.
+  // The play scene is played a little way in before it is caught: every bay is open, some crates
+  // are already stacked on the dock and a line is hanging, so the frame shows the game in progress
+  // rather than at its very first throw.
+  state.bays = state.bays.map((bay) => ({ ...bay, open: true }));
   let planned = false;
   const steps = Math.round(PLAY_LIMIT_SECONDS / PACE.step);
   for (let index = 0; index < steps; index += 1) {
@@ -35,7 +40,8 @@ export function stageShot(name, state, seed) {
     update(state, PACE.step);
     const crate = state.flying[0];
     const live = state.spans.filter((span) => !span.broken).length;
-    if (crate && live >= 1 && crate.x > 620 && crate.x < 900 && Math.abs(crate.vy) < 320 && state.banner <= 0) break;
+    const enough = state.deliveries.length >= 3;
+    if (crate && live >= 1 && enough && crate.x > 620 && crate.x < 900 && Math.abs(crate.vy) < 320 && state.banner <= 0) break;
   }
   return { name: 'play' };
 }
