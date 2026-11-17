@@ -40,6 +40,7 @@ export function createState(seed = 1) {
     timeAccumulator: 0,
     shipmentIndex: 0,
     shipment: shipmentAt(0),
+    totalShipments: SHIPMENTS.length,
     shipmentTime: 0,
     banner: 0,
     bannerTitle: '',

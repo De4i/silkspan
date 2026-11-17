@@ -398,7 +398,38 @@ export function createRenderer(canvas) {
     }
   }
 
-  /** The ticker of short lines in the top right. */
+  /**
+ * The route: one badge per shipment of the run, marked as it is cleared and ringed while it is the
+ * one being worked. It is the run's progress made visible, so a single frame says how far along the
+ * crew is without reading the HUD.
+ */
+function drawRouteStrip(ctx, state) {
+  const count = state.totalShipments ?? 6;
+  const width = 46;
+  const gap = 10;
+  const startX = WORLD.width / 2 - (count * width + (count - 1) * gap) / 2;
+  const y = 26;
+  ctx.save();
+  for (let index = 0; index < count; index += 1) {
+    const x = startX + index * (width + gap);
+    const cleared = index < state.cleared.length;
+    const current = index === state.shipmentIndex && state.phase !== 'title';
+    ctx.fillStyle = cleared ? 'rgba(143,224,138,0.92)' : current ? 'rgba(255,207,92,0.92)' : 'rgba(18,56,64,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, 34, 9);
+    ctx.fill();
+    if (current) {
+      ctx.strokeStyle = PALETTE.text;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+    label(ctx, cleared ? '✓' : String(index + 1), x + width / 2, y + 25, 19, cleared ? '#123840' : current ? '#123840' : 'rgba(242,247,243,0.75)', 'center');
+  }
+  ctx.restore();
+  label(ctx, `ROUTE  ${state.cleared.length} / ${count} shipments cleared`, WORLD.width / 2, y - 8, 15, PALETTE.text, 'center');
+}
+
+/** The ticker of short lines in the top right. */
   function drawMessages(state) {
     ctx.save();
     state.messages.forEach((message, index) => {
@@ -451,6 +482,7 @@ export function createRenderer(canvas) {
       ctx.restore();
     }
 
+    drawRouteStrip(ctx, state);
     if (state.phase === 'title') {
       drawTitle(ctx, { best: extras.best ?? 0, label });
       drawNamePlate(ctx, label);
