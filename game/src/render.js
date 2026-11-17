@@ -254,6 +254,67 @@ export function createRenderer(canvas) {
     }
   }
 
+  /**
+   * The gulls: a body, two wings that beat, and a shadow under them on the water. One that is
+   * diving tips its beak down, so the frame says what it is about to do.
+   */
+  function drawGulls(state) {
+    for (const gull of state.gulls ?? []) {
+      const tilt = gull.dive > 0.1 ? Math.min(0.7, gull.dive * 0.5) : 0;
+      ctx.save();
+      ctx.translate(gull.x, gull.y);
+      ctx.rotate(tilt);
+      const flap = Math.sin(gull.wing) * 0.6;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.moveTo(-16, 0);
+      ctx.quadraticCurveTo(-8, -8 - flap * 8, 2, -2);
+      ctx.quadraticCurveTo(-6, 4, -16, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(16, 0);
+      ctx.quadraticCurveTo(8, -8 - flap * 8, -2, -2);
+      ctx.quadraticCurveTo(6, 4, 16, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#e8eef0';
+      ctx.beginPath();
+      ctx.ellipse(0, 1, 12, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f0b23c';
+      ctx.beginPath();
+      ctx.moveTo(10, -1);
+      ctx.lineTo(20, 2);
+      ctx.lineTo(10, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(20,40,44,0.10)';
+      ctx.beginPath();
+      ctx.ellipse(0, 150, 12, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /** What is left of a clockwork crate's movement, drawn as a ring that runs out. */
+  function drawFuse(crate) {
+    if (!crate.type.fuse || !crate.fuseLeft) return;
+    const share = Math.max(0, Math.min(1, crate.fuseLeft / crate.type.fuse));
+    ctx.save();
+    ctx.strokeStyle = 'rgba(20,40,44,0.25)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(crate.x, crate.y, crate.radius + 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = share < 0.3 ? PALETTE.danger : PALETTE.accent;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(crate.x, crate.y, crate.radius + 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * share);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /** A crate: a banded box that turns as it flies. */
   function drawCrate(ctx2, crate) {
     const size = crate.radius * 2;
@@ -363,6 +424,15 @@ export function createRenderer(canvas) {
           const distance = 14 + (1 - life) * 34;
           ctx.fillRect(fx.x + Math.cos(angle) * distance, fx.y + Math.sin(angle) * distance, 7, 7);
         }
+      } else if (fx.kind === 'gull') {
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        for (let index = 0; index < 5; index += 1) {
+          const angle = (index / 5) * Math.PI * 2 + 0.4;
+          const distance = 10 + (1 - life) * 26;
+          ctx.beginPath();
+          ctx.ellipse(fx.x + Math.cos(angle) * distance, fx.y + Math.sin(angle) * distance - (1 - life) * 10, 7, 3, angle, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else if (fx.kind === 'snap' || fx.kind === 'cut') {
         ctx.strokeStyle = PALETTE.silkHot;
         ctx.lineWidth = 3;
@@ -395,6 +465,7 @@ export function createRenderer(canvas) {
       ctx.fill();
       ctx.restore();
       drawCrate(ctx, crate);
+      drawFuse(crate);
     }
   }
 
@@ -470,6 +541,7 @@ function drawRouteStrip(ctx, state) {
     for (const peg of state.pegs) drawPeg(ctx, peg, extras.highlightPeg === peg.key);
     drawDrag(state, extras.drag);
     drawGuide(extras.guide);
+    drawGulls(state);
     drawAirlines(state);
     drawFx(state);
     drawVignette(ctx);

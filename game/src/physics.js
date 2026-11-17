@@ -54,6 +54,9 @@ export function makeCrate(type, x, y, vx, vy) {
     bay: null,
     /** Seconds left before this crate will feel another span, so one landing is one launch. */
     cooldown: 0,
+    /** How many gulls have shoved this crate, and what is left of a clockwork fuse. */
+    knocked: 0,
+    fuseLeft: type.fuse ?? 0,
   };
 }
 

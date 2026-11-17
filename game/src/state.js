@@ -4,6 +4,7 @@
 // DOM, the canvas or the clock, which is what lets the headless harness and the screenshot scenes
 // drive the real rules.
 import { CHUTE, CRATE_INTERVAL, DOCK, PACE, SILK, SPAN } from './config.js';
+import { createGulls, stepGulls } from './gulls.js';
 import { cablePoint, cableVelocity, clampToGorge, landingOf, makeCrate, stepCrate, strikeSpans, windAccelAt, windReading } from './physics.js';
 import { createRandom, shuffled } from './random.js';
 import { bestBayChain, scoreOf, verdictOf } from './scoring.js';
@@ -60,7 +61,7 @@ export function createState(seed = 1) {
     deliveries: [],
     cleared: [],
     lost: 0,
-    lostBy: { river: 0, cliff: 0, overshoot: 0, cracked: 0, shut: 0 },
+    lostBy: { river: 0, cliff: 0, overshoot: 0, cracked: 0, shut: 0, 'ran down': 0 },
     decked: 0,
     chain: 0,
     bestChain: 0,
@@ -68,6 +69,7 @@ export function createState(seed = 1) {
     wind: { base: 0, gust: 0, period: 7, phase: 0 },
     windAccel: 0,
     windReading: 0,
+    gulls: [],
     fx: [],
     messages: [],
     shake: 0,
@@ -94,10 +96,11 @@ export function startRun(state, seed = state.seed) {
     deliveries: [],
     cleared: [],
     lost: 0,
-    lostBy: { river: 0, cliff: 0, overshoot: 0, cracked: 0, shut: 0 },
+    lostBy: { river: 0, cliff: 0, overshoot: 0, cracked: 0, shut: 0, 'ran down': 0 },
     decked: 0,
     chain: 0,
     bestChain: 0,
+    gulls: [],
     fx: [],
     messages: [],
     shake: 0,
@@ -124,6 +127,7 @@ export function beginShipment(state, index) {
   state.flying = [];
   state.chute = { type: null, t: 0, active: false };
   state.queue = shuffled(shipment.queue, state.random);
+  state.gulls = createGulls(shipment, state.random);
   state.nextCrateIn = 0.85;
   state.shipmentDelivered = 0;
   state.shipmentLost = 0;
@@ -240,7 +244,8 @@ export function textSnapshot(state) {
     pegs: state.pegs.map((peg) => ({ key: peg.key, x: peg.x, y: peg.y })),
     bays: state.bays.map((bay) => ({ key: bay.key, open: bay.open, stacks: state.bayStacks[bay.key] ?? 0 })),
     chute: state.chute.active ? { type: state.chute.type.key, progress: Number(state.chute.t.toFixed(2)) } : null,
-    crates: state.flying.map((crate) => ({ type: crate.type.key, x: Math.round(crate.x), y: Math.round(crate.y), vx: Math.round(crate.vx), vy: Math.round(crate.vy) })),
+    crates: state.flying.map((crate) => ({ type: crate.type.key, x: Math.round(crate.x), y: Math.round(crate.y), vx: Math.round(crate.vx), vy: Math.round(crate.vy), fuseLeft: crate.fuseLeft ? Number(crate.fuseLeft.toFixed(1)) : null })),
+    gulls: state.gulls.map((gull) => ({ x: Math.round(gull.x), y: Math.round(gull.y), diving: gull.dive > 0.1 })),
     coordinateNote: 'x grows right, y grows down; the dock top is y=452 and the river y=640',
   };
 }
@@ -281,6 +286,11 @@ export function stepOnce(state, dt) {
   }
 
   advanceChute(state, dt);
+  const knocked = stepGulls(state.gulls, state.flying, dt);
+  for (const event of knocked) {
+    state.fx.push({ kind: 'gull', x: event.crate.x, y: event.crate.y, life: 0.5, max: 0.5 });
+    say(state, 'A gull knocked that crate off its line', 'warn');
+  }
   flyCrates(state, dt);
 
   if (state.phase !== PHASE.playing) return;
@@ -317,6 +327,14 @@ function flyCrates(state, dt) {
       state.fx.push({ kind: 'snap', x: crate.x, y: crate.y, life: 0.5, max: 0.5 });
       say(state, 'A span parted under that load', 'warn');
       state.shake = Math.min(1, state.shake + 0.5);
+    }
+    if (crate.type.fuse) {
+      crate.fuseLeft = (crate.fuseLeft ?? crate.type.fuse) - dt;
+      if (crate.fuseLeft <= 0) {
+        settle(state, crate, { kind: 'ran down', bay: null });
+        settled.push(crate);
+        continue;
+      }
     }
     if (cracked || impulse / crate.mass > crate.type.crack) {
       settle(state, crate, { kind: 'cracked', bay: null });
@@ -372,6 +390,7 @@ function settle(state, crate, landing) {
     river: 'gone into the river',
     overshoot: 'thrown clean past the dock',
     cracked: `${crate.type.key} shell cracked`,
+    'ran down': 'movement ran down in mid-air',
   };
   state.lost += 1;
   state.lostBy[landing.kind] = (state.lostBy[landing.kind] ?? 0) + 1;

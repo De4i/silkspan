@@ -45,6 +45,12 @@ export const CRATE_TYPES = {
   standard: { key: 'standard', radius: 17, mass: 1.15, crack: 520, softAbove: 1.2, shell: '#d8834a', band: '#a85c2c' },
   wicker: { key: 'wicker', radius: 16, mass: 0.8, crack: 380, softAbove: 0.72, shell: '#e8cf9a', band: '#b98f4d' },
   anvil: { key: 'anvil', radius: 20, mass: 2.6, crack: 700, softAbove: 1.5, shell: '#8d94a3', band: '#5d6472' },
+  /** Blown glass: it takes only the softest line, so it has to be dropped short, never thrown. */
+  glass: { key: 'glass', radius: 16, mass: 0.9, crack: 300, softAbove: 0.5, shell: '#9fd8e2', band: '#5fa9bb' },
+  /** Clockwork: its movement runs down, so it has to be on the dock within its fuse. */
+  clockwork: { key: 'clockwork', radius: 18, mass: 1.3, crack: 460, softAbove: 1.2, fuse: 6, shell: '#e0c07a', band: '#9a7a34' },
+  /** The tall ship's own freight: a monument in a box, and it takes a tight line to move it. */
+  monument: { key: 'monument', radius: 28, mass: 4.2, crack: 2000, softAbove: 1.5, fuse: 9, shell: '#c9a3d8', band: '#8b6aa0' },
 };
 
 /** Silk: how a strung span hangs, how it slings a crate that lands on it, and what a reel pays for. */
@@ -93,6 +99,9 @@ export const PACE = {
   chainStep: 0.15,
   screenFade: 0.25,
 };
+
+/** The gulls: how high they patrol, how fast they cross, how long they sulk after a strike. */
+export const GULL = { height: 250, cruise: 130, dive: 230, cooldown: 3.2, count: 2 };
 
 /** The wind a shipment may blow: a steady drift plus a slow gust that swings the falling crate.
  *  Kept light, because a whole bay is only about a hundred pixels apart. */
