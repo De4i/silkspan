@@ -1,53 +1,77 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
+// What the player is holding, where the pointer is, and the one-shot presses since the last frame.
+// Nothing here knows the rules: it reports intent, and the game loop decides what intent means.
+import { WORLD } from './config.js';
 
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
+export function createInput(canvas) {
+  const held = new Set();
+  let taps = [];
+  const pointer = { x: WORLD.width / 2, y: WORLD.height / 2, down: false, button: 0, released: false, releasedButton: 0 };
+  let lastGesture = 0;
 
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
+  /** A pointer event in the game's own 1280x720 coordinates, whatever the window is doing. */
+  function toWorld(event) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * WORLD.width,
+      y: ((event.clientY - rect.top) / rect.height) * WORLD.height,
+    };
+  }
 
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
-
-  window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
+  canvas.addEventListener('keydown', (event) => {
+    if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.code)) event.preventDefault();
+    if (event.repeat) return;
+    held.add(event.code);
+    taps.push(event.code);
+    lastGesture = performance.now();
+  });
+  canvas.addEventListener('keyup', (event) => held.delete(event.code));
+  canvas.addEventListener('mousemove', (event) => {
+    const point = toWorld(event);
+    pointer.x = point.x;
+    pointer.y = point.y;
+  });
+  canvas.addEventListener('mousedown', (event) => {
+    const point = toWorld(event);
+    pointer.x = point.x;
+    pointer.y = point.y;
+    pointer.down = true;
+    pointer.button = event.button;
+    lastGesture = performance.now();
+    canvas.focus?.();
     event.preventDefault();
   });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
+  window.addEventListener('mouseup', (event) => {
+    pointer.released = true;
+    pointer.releasedButton = event.button;
+    pointer.down = false;
   });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
-  window.addEventListener('blur', () => {
-    left = false;
-    right = false;
-  });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
-  });
+  canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+  // A window that loses focus never sends keyup, so let go of everything when that happens.
+  window.addEventListener('blur', () => held.clear());
 
   return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
-    },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
+    pointer,
+    held: (code) => held.has(code),
+    /** Takes the codes pressed since the last call, in order. */
+    takeTaps() {
+      const taken = taps;
+      taps = [];
       return taken;
     },
+    /** True when any of `codes` was pressed since the last call, and consumes the batch. */
+    tappedAny(...codes) {
+      if (!taps.some((code) => codes.includes(code))) return false;
+      taps = [];
+      return true;
+    },
+    /** True once for the frame after the mouse button came up, with which button it was. */
+    takeRelease() {
+      if (!pointer.released) return false;
+      pointer.released = false;
+      return true;
+    },
+    lastButton: () => pointer.releasedButton,
+    /** Milliseconds since the player last touched a control, which the attract screen watches. */
+    sinceGesture: () => (lastGesture ? performance.now() - lastGesture : Infinity),
   };
 }

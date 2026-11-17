@@ -1,41 +1,64 @@
-// A working best-game-01 entry (Node 22, standard library only): the game is this directory's
-// game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
-// modules, no library and no network request), and the program hands it in. It copies game/ and
-// screenshots/ from beside this file to /output and writes /output/dossier.json, the summary the
-// judge reads, with the vendored make.fun library. A starting point, not a winner: Block Dodger, a
-// plain 2D canvas game where a paddle dodges falling blocks and catches coins, with a title screen,
-// score, lives and levels, game over and restart, flat colours and no sound. Build your own game
-// (any genre, any library you vendor under game/, or none), put your 3 or 4 PNG or JPEG screenshots
-// in screenshots/ (the first by name is the cover) and run it.
-//
-// Serve it locally with `node serve.ts`, then open http://localhost:8080.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+// SILKSPAN hands itself in here: this program copies the playable game and its screenshots out of
+// the repository into the grader's output directory and writes the dossier the judge reads. It runs
+// on the grader's Node 22 with the standard library only and the kit's own dossier builder, and it
+// writes exactly the same bytes on every run of the same tree.
+import { cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
+/** The repository this program is part of: that is what it hands in. */
 const here = fileURLToPath(new URL('.', import.meta.url));
+/** Outside the grader, MAKEFUN_OUTPUT_DIR stands in for the grader's own /output. */
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-mkdirSync(out, { recursive: true });
-cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
-mkdirSync(join(out, 'screenshots'), { recursive: true });
-if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
+/**
+ * The scorer's own caps, passed straight to buildDossier. Only text_max_bytes shapes the dossier's
+ * bytes; the rest refuse an entry the scorer would refuse anyway: more than four screenshots or one
+ * over 256 KiB, more than 993 entries under game/ or 48 MiB of game files in all, or a path under
+ * game/ longer than 1000 bytes.
+ */
+const SCORER_LIMITS = {
+  text_max_bytes: 163840,
+  screenshots: { max: 4, max_bytes: 262144 },
+  game_max_files: 993,
+  game_max_bytes: 50331648,
+  game_path_max_bytes: 1000,
+};
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
-// scorer would refuse (more than 4 screenshots or one over 256 KiB; more than 993 files in game/ or 48 MiB of game
-// files, in all, or a path under game/ over 1000 bytes: game/ counts beside /output's own 1000-entry cap, its
-// screenshots/ and dossier.json).
-writeFileSync(
-  join(out, 'dossier.json'),
-  buildDossier(out, {
-    text_max_bytes: 163840,
-    screenshots: { max: 4, max_bytes: 262144 },
-    game_max_files: 993,
-    game_max_bytes: 50331648,
-    game_path_max_bytes: 1000,
-  }),
-);
+/** Every file under `root`, as paths relative to it. */
+function listFiles(root) {
+  const found = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const full = join(directory, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) found.push(relative(root, full));
+    }
+  };
+  walk(root);
+  return found;
+}
+
+/** Copy one directory of the repository into the output and report what went over. */
+function handIn(source, destination, what) {
+  if (!existsSync(source)) throw new Error(`nothing to hand in: ${source} is missing`);
+  mkdirSync(destination, { recursive: true });
+  cpSync(source, destination, { recursive: true });
+  const files = listFiles(source);
+  const bytes = files.reduce((total, file) => total + statSync(join(source, file)).size, 0);
+  console.log(`${what}: ${files.length} file(s), ${bytes} bytes`);
+  return files;
+}
+
+mkdirSync(out, { recursive: true });
+
+const game = handIn(join(here, 'game'), join(out, 'game'), 'game/');
+const shots = handIn(join(here, 'screenshots'), join(out, 'screenshots'), 'screenshots/');
+
+if (!game.includes('index.html')) throw new Error('game/index.html is missing, so there is no game to play');
+if (shots.length < 3) throw new Error(`screenshots/ holds ${shots.length} image(s); the entry needs three or four`);
+
+writeFileSync(join(out, 'dossier.json'), buildDossier(out, SCORER_LIMITS));
+console.log(`dossier.json: ${statSync(join(out, 'dossier.json')).size} bytes`);
+console.log(`handed in at ${out}`);
