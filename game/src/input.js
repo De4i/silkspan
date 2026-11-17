@@ -17,14 +17,14 @@ export function createInput(canvas) {
     };
   }
 
-  canvas.addEventListener('keydown', (event) => {
+  window.addEventListener('keydown', (event) => {
     if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.code)) event.preventDefault();
     if (event.repeat) return;
     held.add(event.code);
     taps.push(event.code);
     lastGesture = performance.now();
   });
-  canvas.addEventListener('keyup', (event) => held.delete(event.code));
+  window.addEventListener('keyup', (event) => held.delete(event.code));
   canvas.addEventListener('mousemove', (event) => {
     const point = toWorld(event);
     pointer.x = point.x;

@@ -70,8 +70,8 @@ export const SILK = {
   launchMax: 900,
   /** Seconds a crate ignores spans after being slung, so one landing is one launch. */
   hitCooldown: 0.22,
-  strainPerImpulse: 0.0007,
-  strainDecay: 0.55,
+  strainPerImpulse: 0.0006,
+  strainDecay: 1.8,
   snapStrain: 1,
   impulseShare: 0.55,
   reelPerShipment: 2100,

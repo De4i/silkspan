@@ -106,46 +106,54 @@ function handlePointer() {
     return;
   }
   const pointer = input.pointer;
-  if (input.takeRelease()) {
-    const released = input.lastButton();
-    if (released === 2) {
+  const released = input.takeRelease();
+  const button = input.lastButton();
+  const target = pegUnder(pointer.x, pointer.y);
+
+  /** Hang the line the hand is holding, if the two posts allow it. */
+  const hangFrom = (indexA, indexB) => {
+    const plan = spanPlan(indexA, indexB);
+    if (plan.ok && stringBetween(state, indexA, indexB).ok) audio.throwCrate();
+  };
+
+  if (released) {
+    if (button === 2) {
       if (cutNearest(state, pointer.x, pointer.y)) audio.snapped();
       pick = null;
       drag = null;
       return;
     }
-    const target = pegUnder(pointer.x, pointer.y);
-    if (pick && pick.moved) {
-      if (target !== null && target !== pick.index) {
-        const plan = spanPlan(pick.index, target);
-        if (plan.ok && stringBetween(state, pick.index, target).ok) audio.throwCrate();
-      }
+    if (pick && (pick.moved || (target !== null && target !== pick.index))) {
+      // A line dragged or a second post clicked: hang it, and let the hand go.
+      if (target !== null && target !== pick.index) hangFrom(pick.index, target);
       pick = null;
       drag = null;
       return;
     }
-    if (pick && !pick.moved) {
-      if (target !== null && target !== pick.index) {
-        const plan = spanPlan(pick.index, target);
-        if (plan.ok && stringBetween(state, pick.index, target).ok) audio.throwCrate();
-        pick = null;
-      }
+    if (pick) {
+      // A click on the post it already holds: keep holding it, so a second click can finish the line.
+      drag = null;
       return;
     }
-    if (target !== null) pick = { index: target, moved: false, x: pointer.x, y: pointer.y };
+    pick = null;
+    drag = null;
+    return;
   }
+
+  // A press on a post picks it up; the line then follows the pointer until it is let go.
+  if (pointer.down && !pick && target !== null) pick = { index: target, moved: false, x: pointer.x, y: pointer.y };
   if (pointer.down && pick && !pick.moved && Math.hypot(pointer.x - pick.x, pointer.y - pick.y) > 9) pick.moved = true;
   if (pick?.moved) {
-    const target = pegUnder(pointer.x, pointer.y, 46);
-    const plan = spanPlan(pick.index, target);
+    const near = pegUnder(pointer.x, pointer.y, 46);
+    const plan = spanPlan(pick.index, near);
     drag = {
       from: pick.index,
-      x: target !== null ? state.pegs[target].x : pointer.x,
-      y: target !== null ? state.pegs[target].y : pointer.y,
-      ok: plan.ok && target !== null,
+      x: near !== null ? state.pegs[near].x : pointer.x,
+      y: near !== null ? state.pegs[near].y : pointer.y,
+      ok: plan.ok && near !== null,
       reason: plan.reason,
       length: plan.length ?? 0,
-      target,
+      target: near,
     };
   } else {
     drag = null;
@@ -190,6 +198,8 @@ window.render_game_to_text = () =>
   JSON.stringify({
     ...textSnapshot(state),
     best,
+    hand: pick ? { from: state.pegs[pick.index]?.key, moved: pick.moved, over: drag?.target != null ? state.pegs[drag.target].key : null, ok: drag?.ok ?? false, reason: drag?.reason ?? null } : null,
+    pointer: input ? { x: Math.round(input.pointer.x), y: Math.round(input.pointer.y), down: input.pointer.down, peg: pegUnder(input.pointer.x, input.pointer.y) !== null ? state.pegs[pegUnder(input.pointer.x, input.pointer.y)].key : null } : null,
     guide: (() => {
       const guide = buildGuide(null);
       return guide ? { landing: guide.landing.kind, bay: guide.bayKey, x: Math.round(guide.landing.x), y: Math.round(guide.landing.y) } : null;
